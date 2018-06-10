@@ -1,14 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/minio/minio-go"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/avutil"
 	"github.com/nareix/joy4/av/transcode"
@@ -17,22 +20,78 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func transcodeVideo(b []byte) {
-	url := fmt.Sprintf("%s", b)
+type EncodingRequest struct {
+	User  string
+	Video string
+}
+
+func uploadToMinio(user, fname string) error {
+	// parameterise ones below
+	endpoint := "localhost:9000"
+	accessKeyID := "S326T87GSXL9K0Y6T6M2"
+	secretAccessKey := "bB4Qy2NoLAUAxVug/6pZxM/xsVSlrFnXZcHFLxPC"
+
+	minioClient, err := minio.New(endpoint, accessKeyID, secretAccessKey, false)
+	if err != nil {
+		return err
+	}
+
+	err = minioClient.MakeBucket(user, "eu-west-1")
+	if err != nil {
+		// Check to see if we already own this bucket (which happens if you run this twice)
+		exists, err := minioClient.BucketExists("eu-west-1")
+		if err == nil && exists {
+			log.Printf("We already own %s\n", "eu-west-1")
+		} else {
+			return err
+		}
+	}
+
+	// Upload the zip file
+	objectName := fname
+	filePath := fname
+	contentType := "video/mp4"
+
+	// Upload the zip file with FPutObject
+	n, err := minioClient.FPutObject(user, objectName, filePath, minio.PutObjectOptions{ContentType: contentType})
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Successfully uploaded %s of size %d\n", objectName, n)
+
+	os.Remove(fname)
+
+	return nil
+
+}
+
+func transcodeVideo(b []byte) error {
+	var m EncodingRequest
+	err := json.Unmarshal(b, &m)
+	if err != nil {
+		return err
+	}
+
+	url := m.Video
+	user := strings.ToLower(m.User)
 
 	fmt.Printf("Received a request to convert: %s\n", url)
 
 	resp, err := http.Get(url)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer resp.Body.Close()
 
 	epoch := time.Now().Unix()
 
-	out, err := os.Create(strconv.Itoa(int(epoch)) + "_source.mp4")
+	sourceFn := user + "_" + strconv.Itoa(int(epoch)) + "_source.mp4"
+	targetFn := user + "_" + strconv.Itoa(int(epoch)) + "_transcode.mp4"
+
+	out, err := os.Create(sourceFn)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer out.Close()
 
@@ -42,7 +101,7 @@ func transcodeVideo(b []byte) {
 	format.RegisterAll()
 
 	fmt.Printf("Starting conversion for: %s\n", url)
-	file, _ := avutil.Open(strconv.Itoa(int(epoch)) + "_source.mp4")
+	file, _ := avutil.Open(sourceFn)
 	streams, _ := file.Streams()
 	var dec *ffmpeg.AudioDecoder
 
@@ -57,7 +116,7 @@ func transcodeVideo(b []byte) {
 		if streams[pkt.Idx].Type() == av.AAC {
 			ok, frame, _ := dec.Decode(pkt.Data)
 			if ok {
-				fmt.Printf("Decoding in process...", frame.SampleCount)
+				fmt.Println("Decoding in process...", frame.SampleCount)
 			}
 		}
 	}
@@ -67,14 +126,22 @@ func transcodeVideo(b []byte) {
 		Demuxer: file,
 	}
 
-	outfile, _ := avutil.Create(strconv.Itoa(int(epoch)) + "_transcode.mp4")
+	outfile, _ := avutil.Create(targetFn)
 	avutil.CopyFile(outfile, trans)
 
 	outfile.Close()
 	file.Close()
 	trans.Close()
 
-	fmt.Println("Conversion finished! Waiting for more!")
+	os.Remove(sourceFn)
+
+	err = uploadToMinio(user, targetFn)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
 }
 
 func main() {
@@ -109,7 +176,7 @@ func main() {
 	msgs, err := ch.Consume(
 		q.Name, // queue
 		"",     // consumer
-		true,   // auto-ack
+		false,  // auto-ack
 		false,  // exclusive
 		false,  // no-local
 		false,  // no-wait
@@ -123,7 +190,11 @@ func main() {
 
 	go func() {
 		for d := range msgs {
-			transcodeVideo(d.Body)
+			err := transcodeVideo(d.Body)
+			if err != nil {
+				d.Ack(false)
+			}
+			d.Ack(true)
 		}
 	}()
 
