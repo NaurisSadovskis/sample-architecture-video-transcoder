@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -8,6 +9,11 @@ import (
 
 	"github.com/streadway/amqp"
 )
+
+type EncodingRequest struct {
+	User  string
+	Video string
+}
 
 // size validation can be moved to web tier, instead of API.
 func checkVideo(u string) error {
@@ -34,6 +40,12 @@ func main() {
 	videoURL := "https://www.sample-videos.com/video/mp4/720/big_buck_bunny_720p_5mb.mp4"
 
 	err := checkVideo(videoURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	m := EncodingRequest{"myuser", videoURL}
+	encodedJson, err := json.Marshal(m)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -71,7 +83,7 @@ func main() {
 		false,  // immediate
 		amqp.Publishing{
 			ContentType: "text/plain",
-			Body:        []byte(videoURL),
+			Body:        encodedJson,
 		})
 
 	fmt.Println("Message to RabbitMQ sent!")
