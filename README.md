@@ -15,9 +15,12 @@ Both, `api` and `transcoder` are written in Go and use:
 * Trancsoder service transcodes and uploads the final video to the user's minio bucket
 
 TODO:
-- Vendoring dependencies
-- Parameterise things
-- Build API with OpenAPI/RUML
-- persistance layer
-- auto credential issuing for Minio
-- web layer
+- ~~Vendor Go dependencies~~
+- Parameterise configuration
+- ~~Build API with OpenAPI/RAML~~
+- Containerise applications
+- Add build steps
+- Add structured logging
+- Add persistance layer
+- Auto credential issuing for Minio
+- Create a web layer
