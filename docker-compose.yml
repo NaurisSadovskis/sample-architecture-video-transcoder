@@ -4,5 +4,13 @@ services:
   rabbitmq:
     image: "rabbitmq:3.7-management"
     ports:
-    - "5672:5672"
-    - "8080:15672"
+      - "5672:5672"
+      - "8080:15672"
+  minio:
+    image: "minio/minio:latest"
+    command: "server /data"
+    volumes:
+      - ./storage:/data
+      - ./.minio:/root/.minio
+    ports:
+    - "9000:9000"
