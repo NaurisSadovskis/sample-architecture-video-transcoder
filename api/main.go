@@ -1,91 +1,33 @@
+// THIS FILE IS SAFE TO EDIT. It will not be overwritten when rerunning go-raml.
 package main
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
 	"log"
 	"net/http"
 
-	"github.com/streadway/amqp"
+	"github.com/sample-architecture-video-transcoder/api/goraml"
+
+	"github.com/gorilla/mux"
+	"gopkg.in/validator.v2"
 )
 
-type EncodingRequest struct {
-	User  string
-	Video string
-}
-
-// size validation can be moved to web tier, instead of API.
-func checkVideo(u string) error {
-	response, err := http.Get(u)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-
-	if response.Header.Get("Content-type") != "video/mp4" {
-		return errors.New("This is not a video")
-	}
-
-	fileSizeLimit := 10000000 // 10MB
-
-	if response.ContentLength > int64(fileSizeLimit) {
-		return errors.New("File is too large. Limit 10MB")
-	}
-
-	return nil
-}
-
 func main() {
-	videoURL := "https://www.sample-videos.com/video/mp4/720/big_buck_bunny_720p_5mb.mp4"
+	// input validator
+	validator.SetValidationFunc("multipleOf", goraml.MultipleOf)
 
-	err := checkVideo(videoURL)
-	if err != nil {
-		log.Fatal(err)
-	}
+	r := mux.NewRouter()
 
-	m := EncodingRequest{"myuser", videoURL}
-	encodedJson, err := json.Marshal(m)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// home page
+	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "index.html")
+	})
 
-	fmt.Println("Sending file to RabbitMQ...")
+	// apidocs
+	r.PathPrefix("/apidocs/").Handler(http.StripPrefix("/apidocs/", http.FileServer(http.Dir("./apidocs/"))))
 
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
-	if err != nil {
-		log.Fatal("Failed to connect to RabbitMQ")
-	}
-	defer conn.Close()
-	ch, err := conn.Channel()
-	if err != nil {
-		log.Fatal("Failed to open a channel")
-	}
-	defer ch.Close()
+	initRoutes(r)
 
-	q, err := ch.QueueDeclare(
-		"transcode-requests",
-		false,
-		false,
-		false,
-		false,
-		nil,
-	)
-
-	if err != nil {
-		log.Fatal("Failed to declare a queue")
-	}
-
-	err = ch.Publish(
-		"",     // exchange
-		q.Name, // routing key
-		false,  // mandatory
-		false,  // immediate
-		amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        encodedJson,
-		})
-
-	fmt.Println("Message to RabbitMQ sent!")
+	log.Println("starting server")
+	http.ListenAndServe(":5000", r)
 
 }

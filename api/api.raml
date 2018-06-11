@@ -1,0 +1,26 @@
+#%RAML 1.0
+title: Video Platform API
+version: v1
+
+traits:
+  secured: !include secured.raml
+
+types:
+  transcodeJob:
+    type: object
+    properties:
+      userID: string
+      videoURL: string
+
+/transcode/job:
+  is: [ secured ]
+  post:
+    securedBy: [ access_token ]
+    body:
+      application/json:
+        type: transcodeJob
+        example: | # example of how a response looks
+          {
+            "userID": "nancy1985",
+            "videoURL": "https://funny-videos.com/cats.mp4"
+          }
