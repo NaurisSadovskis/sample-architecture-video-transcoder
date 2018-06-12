@@ -7,7 +7,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/sample-architecture-video-transcoder/api/types"
+	"github.com/NaurisSadovskis/sample-architecture-video-transcoder/api/types"
 	"github.com/streadway/amqp"
 )
 
@@ -35,7 +35,7 @@ func checkVideo(u string) error {
 func (api TranscodejobAPI) Post(w http.ResponseWriter, r *http.Request) {
 
 	// TODO START: Move this out
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	conn, err := amqp.Dial("amqp://guest:guest@rabbitmq:5672/")
 	if err != nil {
 		log.Fatal("Failed to connect to RabbitMQ")
 	}
@@ -71,7 +71,7 @@ func (api TranscodejobAPI) Post(w http.ResponseWriter, r *http.Request) {
 
 	err = checkVideo(reqBody.VideoURL)
 	if err != nil {
-		log.Printf("Video submission by %s is invalid - wrong content type for video: %s", reqBody.UserID, reqBody.VideoURL)
+		log.Println(err)
 		return
 	}
 

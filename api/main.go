@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/sample-architecture-video-transcoder/api/goraml"
+	"github.com/NaurisSadovskis/sample-architecture-video-transcoder/api/goraml"
 
 	"github.com/gorilla/mux"
 	"gopkg.in/validator.v2"
@@ -26,6 +26,8 @@ func main() {
 	r.PathPrefix("/apidocs/").Handler(http.StripPrefix("/apidocs/", http.FileServer(http.Dir("./apidocs/"))))
 
 	initRoutes(r)
+
+	// TODO: Move RabbitMQ initalisation here.
 
 	log.Println("starting server")
 	http.ListenAndServe(":5000", r)

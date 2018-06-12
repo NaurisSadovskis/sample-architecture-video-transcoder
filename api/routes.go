@@ -4,7 +4,7 @@ package main
 import (
 	"github.com/gorilla/mux"
 
-	"github.com/sample-architecture-video-transcoder/api/handlers/transcodejob"
+	"github.com/NaurisSadovskis/sample-architecture-video-transcoder/api/handlers/transcodejob"
 )
 
 func initRoutes(r *mux.Router) {
