@@ -3,3 +3,5 @@ storage/
 *.mp4
 .minio
 .env
+transcoder-api
+transcoder-service
