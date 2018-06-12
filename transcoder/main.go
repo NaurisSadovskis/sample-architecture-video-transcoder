@@ -27,7 +27,7 @@ type EncodingRequest struct {
 
 func uploadToMinio(user, fname string) error {
 	// parameterise ones below
-	endpoint := "localhost:9000"
+	endpoint := "minio:9000"
 	accessKeyID := "S326T87GSXL9K0Y6T6M2"
 	secretAccessKey := "bB4Qy2NoLAUAxVug/6pZxM/xsVSlrFnXZcHFLxPC"
 
@@ -146,7 +146,7 @@ func transcodeVideo(b []byte) error {
 
 func main() {
 
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	conn, err := amqp.Dial("amqp://guest:guest@rabbitmq:5672/")
 	if err != nil {
 		log.Fatal("Failed to open a conncetion")
 	}
